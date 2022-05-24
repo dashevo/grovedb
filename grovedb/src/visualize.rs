@@ -8,11 +8,11 @@ use crate::{subtree::Element, util::storage_context_optional_tx, GroveDb, Transa
 impl Visualize for Element {
     fn visualize<W: Write>(&self, mut drawer: Drawer<W>) -> Result<Drawer<W>> {
         match self {
-            Element::Item(value) => {
+            Element::Item(value, _) => {
                 drawer.write(b"item: ")?;
                 drawer = value.visualize(drawer)?;
             }
-            Element::Reference(_ref) => {
+            Element::Reference(_ref, _) => {
                 drawer.write(b"ref")?;
                 // drawer.write(b"ref: [path: ")?;
                 // let mut path_iter = path.iter();
@@ -129,7 +129,7 @@ mod tests {
     #[test]
     fn test_element_item_str() {
         let v = b"ayylmao".to_vec();
-        let e = Element::Item(v.clone());
+        let e = Element::new_item(v.clone());
         let element_hex = to_hex(&v);
         let mut result = Vec::new();
         let drawer = Drawer::new(&mut result);
@@ -146,7 +146,7 @@ mod tests {
     #[test]
     fn test_element_item_no_tr() {
         let v = vec![1, 3, 3, 7, 255];
-        let e = Element::Item(v.clone());
+        let e = Element::new_item(v.clone());
         let element_hex = to_hex(&v);
         let mut result = Vec::new();
         let drawer = Drawer::new(&mut result);
@@ -162,7 +162,7 @@ mod tests {
     fn test_visualize_reference() {
         let p1 = b"ayy".to_vec();
         let p2 = b"lmao".to_vec();
-        let e = Element::Reference(vec![p1.clone(), p2.clone()]);
+        let e = Element::new_reference(vec![p1.clone(), p2.clone()]);
         let mut result = Vec::new();
         let drawer = Drawer::new(&mut result);
         e.visualize(drawer).expect("visualize IO error");

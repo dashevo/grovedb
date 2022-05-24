@@ -120,7 +120,6 @@ impl ProofVerifier {
                                 continue;
                             }
 
-
                             if subquery_key.is_some() {
                                 if subquery_value.is_none() {
                                     self.verify_subquery_key(

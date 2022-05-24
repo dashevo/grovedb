@@ -475,8 +475,8 @@ mod tests {
     #[test]
     fn test_batch_validation_ok() {
         let db = make_grovedb();
-        let element = Element::Item(b"ayy".to_vec());
-        let element2 = Element::Item(b"ayy2".to_vec());
+        let element = Element::new_item(b"ayy".to_vec());
+        let element2 = Element::new_item(b"ayy2".to_vec());
         let ops = vec![
             GroveDbOp::insert(vec![], b"key1".to_vec(), Element::empty_tree()),
             GroveDbOp::insert(
@@ -530,7 +530,7 @@ mod tests {
     #[test]
     fn test_batch_validation_broken_chain() {
         let db = make_grovedb();
-        let element = Element::Item(b"ayy".to_vec());
+        let element = Element::new_item(b"ayy".to_vec());
         let ops = vec![
             GroveDbOp::insert(vec![], b"key1".to_vec(), Element::empty_tree()),
             GroveDbOp::insert(
@@ -551,7 +551,7 @@ mod tests {
     #[test]
     fn test_batch_validation_broken_chain_aborts_whole_batch() {
         let db = make_grovedb();
-        let element = Element::Item(b"ayy".to_vec());
+        let element = Element::new_item(b"ayy".to_vec());
         let ops = vec![
             GroveDbOp::insert(
                 vec![TEST_LEAF.to_vec()],
@@ -583,7 +583,7 @@ mod tests {
     #[test]
     fn test_batch_validation_deletion_brokes_chain() {
         let db = make_grovedb();
-        let element = Element::Item(b"ayy".to_vec());
+        let element = Element::new_item(b"ayy".to_vec());
 
         db.insert([], b"key1", Element::empty_tree(), None)
             .expect("cannot insert a subtree");
@@ -609,7 +609,7 @@ mod tests {
     #[test]
     fn test_batch_validation_deletion_and_insertion_restore_chain() {
         let db = make_grovedb();
-        let element = Element::Item(b"ayy".to_vec());
+        let element = Element::new_item(b"ayy".to_vec());
         let ops = vec![
             GroveDbOp::insert(vec![], b"key1".to_vec(), Element::empty_tree()),
             GroveDbOp::insert(
@@ -640,7 +640,7 @@ mod tests {
     #[test]
     fn test_batch_validation_insert_into_existing_tree() {
         let db = make_grovedb();
-        let element = Element::Item(b"ayy".to_vec());
+        let element = Element::new_item(b"ayy".to_vec());
 
         db.insert([TEST_LEAF], b"invalid", element.clone(), None)
             .expect("cannot insert value");
@@ -672,8 +672,8 @@ mod tests {
     #[test]
     fn test_batch_validation_nested_subtree_overwrite() {
         let db = make_grovedb();
-        let element = Element::Item(b"ayy".to_vec());
-        let element2 = Element::Item(b"ayy2".to_vec());
+        let element = Element::new_item(b"ayy".to_vec());
+        let element2 = Element::new_item(b"ayy2".to_vec());
         db.insert([TEST_LEAF], b"key_subtree", Element::empty_tree(), None)
             .expect("cannot insert a subtree");
         db.insert([TEST_LEAF, b"key_subtree"], b"key2", element, None)
@@ -721,7 +721,11 @@ mod tests {
     fn test_batch_validation_root_leaf_removal() {
         let db = make_grovedb();
         let ops = vec![
-            GroveDbOp::insert(vec![], TEST_LEAF.to_vec(), Element::Item(b"ayy".to_vec())),
+            GroveDbOp::insert(
+                vec![],
+                TEST_LEAF.to_vec(),
+                Element::new_item(b"ayy".to_vec()),
+            ),
             GroveDbOp::insert(
                 vec![TEST_LEAF.to_vec()],
                 b"key1".to_vec(),
@@ -734,7 +738,7 @@ mod tests {
     #[test]
     fn test_merk_data_is_deleted() {
         let db = make_grovedb();
-        let element = Element::Item(b"ayy".to_vec());
+        let element = Element::new_item(b"ayy".to_vec());
 
         db.insert([TEST_LEAF], b"key1", Element::empty_tree(), None)
             .expect("cannot insert a subtree");
@@ -743,7 +747,7 @@ mod tests {
         let ops = vec![GroveDbOp::insert(
             vec![TEST_LEAF.to_vec()],
             b"key1".to_vec(),
-            Element::Item(b"ayy2".to_vec()),
+            Element::new_item(b"ayy2".to_vec()),
         )];
 
         assert_eq!(
@@ -770,8 +774,8 @@ mod tests {
             .ok()
             .flatten()
             .expect("cannot get root hash");
-        let element = Element::Item(b"ayy".to_vec());
-        let element2 = Element::Item(b"ayy2".to_vec());
+        let element = Element::new_item(b"ayy".to_vec());
+        let element2 = Element::new_item(b"ayy2".to_vec());
 
         let ops = vec![
             GroveDbOp::insert(
@@ -848,7 +852,7 @@ mod tests {
             acc_path.push(p);
         }
 
-        let element = Element::Item(b"ayy".to_vec());
+        let element = Element::new_item(b"ayy".to_vec());
         let batch = vec![GroveDbOp::insert(
             acc_path.clone(),
             b"key".to_vec(),

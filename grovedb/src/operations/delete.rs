@@ -121,6 +121,62 @@ impl GroveDb {
                     delete_element()?;
                 }
             } else {
+                fn to_slice(x: &Vec<u8>) -> &[u8] {
+                    x.as_slice()
+                }
+
+                if let Element::Reference(ref base_element_path, _) = element {
+                    let (base_element_key, base_element_subtree_path) = base_element_path
+                        .split_last()
+                        .expect("reference path cannot be empty");
+
+                    let base_element_subtree_path_as_slice =
+                        base_element_subtree_path.iter().map(to_slice);
+                    let mut base_element = self.get(
+                        base_element_subtree_path_as_slice.clone(),
+                        base_element_key,
+                        transaction,
+                    )?;
+
+                    match base_element {
+                        Element::Tree(_) => {}
+                        Element::Item(_, ref mut references)
+                        | Element::Reference(_, ref mut references) => {
+                            let mut path_owned: Vec<Vec<u8>> =
+                                path_iter.clone().map(|x| x.to_vec()).collect();
+                            path_owned.push(key.to_vec());
+                            let position = references.iter().position(|path| path == &path_owned);
+                            if let Some(index) = position {
+                                references.remove(index);
+                                merk_optional_tx!(
+                                    self.db,
+                                    base_element_subtree_path_as_slice,
+                                    transaction,
+                                    mut subtree,
+                                    {
+                                        base_element.insert(&mut subtree, base_element_key)?;
+                                    }
+                                );
+                            }
+                        }
+                    }
+                }
+
+                if let Element::Item(_, references) | Element::Reference(_, references) = element {
+                    // recursively delete all references of to be deleted element
+                    for reference in references {
+                        let (referenced_key, reference_subtree_path) = reference
+                            .split_last()
+                            .expect("reference path cannot be empty");
+                        self.delete_internal(
+                            reference_subtree_path.iter().map(to_slice),
+                            referenced_key,
+                            false,
+                            transaction,
+                        )?;
+                    }
+                }
+
                 delete_element()?;
             }
             self.propagate_changes(path_iter, transaction)?;

@@ -29,7 +29,7 @@ impl GroveDb {
                     self.propagate_changes(path_iter, transaction)?;
                 }
             }
-            Element::Reference(ref reference_path) => {
+            Element::Reference(ref reference_path, _) => {
                 if path_iter.len() == 0 {
                     return Err(Error::InvalidPath(
                         "only subtrees are allowed as root tree's leafs",
@@ -37,18 +37,56 @@ impl GroveDb {
                 }
 
                 self.check_subtree_exists_invalid_path(path_iter.clone(), Some(key), transaction)?;
-                let referenced_element =
-                    self.follow_reference(reference_path.to_owned(), transaction)?;
 
+                // reference path denotes the element we are directly referencing
+                let (referenced_key, referenced_subtree_path) = reference_path
+                    .split_last()
+                    .ok_or(Error::InvalidPath("invalid reference path"))?;
+
+                let mut referenced_element = self.get_raw(
+                    referenced_subtree_path.iter().map(|x| x.as_slice()),
+                    referenced_key,
+                    transaction,
+                )?;
+
+                match referenced_element {
+                    Element::Item(_, ref mut references)
+                    | Element::Reference(_, ref mut references) => {
+                        let mut path_owned: Vec<Vec<u8>> =
+                            path_iter.clone().map(|x| x.to_vec()).collect();
+                        path_owned.push(key.to_vec());
+                        references.push(path_owned);
+                    }
+                    _ => {
+                        return Err(Error::InvalidPath("cannot reference tree items"));
+                    }
+                }
+
+                // update the reference list of the referenced item
+                merk_optional_tx!(
+                    self.db,
+                    referenced_subtree_path.iter().map(|x| x.as_slice()),
+                    transaction,
+                    mut subtree,
+                    {
+                        referenced_element.insert(&mut subtree, referenced_key.as_slice())?;
+                    }
+                );
+                self.propagate_changes(
+                    referenced_subtree_path.iter().map(|x| x.as_slice()),
+                    transaction,
+                );
+
+                // insert the reference
+                let base_element = self.follow_reference(reference_path.to_owned(), transaction)?;
                 merk_optional_tx!(self.db, path_iter.clone(), transaction, mut subtree, {
-                    element.insert_reference(&mut subtree, key, referenced_element.serialize()?)?;
+                    element.insert_reference(&mut subtree, key, base_element.serialize()?)?;
                 });
                 self.propagate_changes(path_iter, transaction)?;
             }
             _ => {
                 // If path is empty that means there is an attempt to insert
-                // something into a root tree and this branch is for anything
-                // but trees
+                // something into a root tree and this branch is for items
                 if path_iter.len() == 0 {
                     return Err(Error::InvalidPath(
                         "only subtrees are allowed as root tree's leaves",

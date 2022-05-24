@@ -5,10 +5,7 @@ mod subtree;
 mod tests;
 mod util;
 mod visualize;
-use std::{
-    collections::{BTreeMap, HashMap},
-    path::Path,
-};
+use std::{collections::BTreeMap, path::Path};
 
 pub use merk::proofs::{query::QueryItem, Query};
 use merk::{self, Merk};
