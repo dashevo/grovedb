@@ -1,6 +1,7 @@
 use std::io::{Read, Write};
 
 use ed::{Decode, Encode, Result, Terminated};
+use byteorder::{BigEndian, ReadBytesExt};
 
 use super::{hash::Hash, Tree};
 
@@ -228,9 +229,9 @@ impl Encode for Link {
             Link::Modified { .. } => panic!("No encoding for Link::Modified"),
         };
 
-        debug_assert!(key.len() < 256, "Key length must be less than 256");
+        debug_assert!(key.len() <= 1024, "Key length must be less than or equal 1024");
 
-        out.write_all(&[key.len() as u8])?;
+        out.write_all((key.len() as u16).to_be_bytes().as_slice())?;
         out.write_all(key)?;
 
         out.write_all(hash)?;
@@ -242,13 +243,13 @@ impl Encode for Link {
 
     #[inline]
     fn encoding_length(&self) -> Result<usize> {
-        debug_assert!(self.key().len() < 256, "Key length must be less than 256");
+        debug_assert!(self.key().len() <= 1024, "Key length must be less than or equal 1024");
 
         Ok(match self {
-            Link::Reference { key, .. } => 1 + key.len() + 32 + 2,
+            Link::Reference { key, .. } => 2 + key.len() + 32 + 2,
             Link::Modified { .. } => panic!("No encoding for Link::Modified"),
-            Link::Uncommitted { tree, .. } => 1 + tree.key().len() + 32 + 2,
-            Link::Loaded { tree, .. } => 1 + tree.key().len() + 32 + 2,
+            Link::Uncommitted { tree, .. } => 2 + tree.key().len() + 32 + 2,
+            Link::Loaded { tree, .. } => 2 + tree.key().len() + 32 + 2,
         })
     }
 }
@@ -286,7 +287,7 @@ impl Decode for Link {
             ref mut child_heights,
         } = self
         {
-            let length = read_u8(&mut input)? as usize;
+            let length = read_u16(&mut input)? as usize;
 
             key.resize(length, 0);
             input.read_exact(key.as_mut())?;
@@ -310,6 +311,13 @@ fn read_u8<R: Read>(mut input: R) -> Result<u8> {
     let mut length = [0];
     input.read_exact(length.as_mut())?;
     Ok(length[0])
+}
+
+#[inline]
+fn read_u16<R: Read>(mut input: R) -> Result<u16> {
+    let mut length = [0,0];
+    input.read_exact(length.as_mut())?;
+    Ok(length.as_slice().read_u16::<BigEndian>()?)
 }
 
 #[cfg(test)]
@@ -453,7 +461,7 @@ mod test {
         assert_eq!(
             bytes,
             vec![
-                3, 1, 2, 3, 55, 55, 55, 55, 55, 55, 55, 55, 55, 55, 55, 55, 55, 55, 55, 55, 55, 55,
+                0, 3, 1, 2, 3, 55, 55, 55, 55, 55, 55, 55, 55, 55, 55, 55, 55, 55, 55, 55, 55, 55, 55,
                 55, 55, 55, 55, 55, 55, 55, 55, 55, 55, 55, 55, 55, 55, 123, 124
             ]
         );
@@ -463,7 +471,7 @@ mod test {
     #[should_panic]
     fn encode_link_long_key() {
         let link = Link::Reference {
-            key: vec![123; 300],
+            key: vec![123; 1250],
             child_heights: (123, 124),
             hash: [55; 32],
         };

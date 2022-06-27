@@ -21,7 +21,8 @@ impl Encode for Op {
                 debug_assert!(key.len() < 256);
                 debug_assert!(value.len() < 65536);
 
-                dest.write_all(&[0x03, key.len() as u8])?;
+                dest.write_all(&[0x03])?;
+                (key.len() as u16).encode_into(dest)?;
                 dest.write_all(key)?;
                 (value.len() as u16).encode_into(dest)?;
                 dest.write_all(value)?;
@@ -36,7 +37,7 @@ impl Encode for Op {
         Ok(match self {
             Op::Push(Node::Hash(_)) => 1 + HASH_LENGTH,
             Op::Push(Node::KVHash(_)) => 1 + HASH_LENGTH,
-            Op::Push(Node::KV(key, value)) => 4 + key.len() + value.len(),
+            Op::Push(Node::KV(key, value)) => 5 + key.len() + value.len(),
             Op::Parent => 1,
             Op::Child => 1,
         })
@@ -59,7 +60,7 @@ impl Decode for Op {
                 Self::Push(Node::KVHash(hash))
             }
             0x03 => {
-                let key_len: u8 = Decode::decode(&mut input)?;
+                let key_len: u16 = Decode::decode(&mut input)?;
                 let mut key = vec![0; key_len as usize];
                 input.read_exact(key.as_mut_slice())?;
 
@@ -188,11 +189,11 @@ mod test {
     #[test]
     fn encode_push_kv() {
         let op = Op::Push(Node::KV(vec![1, 2, 3], vec![4, 5, 6]));
-        assert_eq!(op.encoding_length(), 10);
+        assert_eq!(op.encoding_length(), 11);
 
         let mut bytes = vec![];
         op.encode_into(&mut bytes).unwrap();
-        assert_eq!(bytes, vec![0x03, 3, 1, 2, 3, 0, 3, 4, 5, 6]);
+        assert_eq!(bytes, vec![0x03, 0, 3, 1, 2, 3, 0, 3, 4, 5, 6]);
     }
 
     #[test]
@@ -245,7 +246,7 @@ mod test {
 
     #[test]
     fn decode_push_kv() {
-        let bytes = [0x03, 3, 1, 2, 3, 0, 3, 4, 5, 6];
+        let bytes = [0x03, 0, 3, 1, 2, 3, 0, 3, 4, 5, 6];
         let op = Op::decode(&bytes[..]).expect("decode failed");
         assert_eq!(op, Op::Push(Node::KV(vec![1, 2, 3], vec![4, 5, 6])));
     }
