@@ -14,6 +14,8 @@ use super::{
 };
 use crate::{AbstractBatchOperation, Storage, StorageBatch};
 
+const BLAKE_BLOCK_LEN: usize = 64;
+
 /// Name of column family used to store auxiliary data
 pub(crate) const AUX_CF_NAME: &str = "aux";
 /// Name of column family used to store subtrees roots data
@@ -81,17 +83,6 @@ impl RocksDbStorage {
         res
     }
 
-    /// A helper method to figure out how many blake3 hashes are needed to build
-    /// a prefix
-    pub fn build_prefix_hash_count<'a, P>(path: P) -> u16
-    where
-        P: IntoIterator<Item = &'a [u8]>,
-    {
-        let body = Self::build_prefix_body(path);
-        // the block size of blake3 is 64
-        (body.len() as u32 / 64 + 1) as u16
-    }
-
     /// A helper method to build a prefix to rocksdb keys or identify a subtree
     /// in `subtrees` map by tree path;
     pub fn build_prefix<'a, P>(path: P) -> CostContext<Vec<u8>>
@@ -99,10 +90,12 @@ impl RocksDbStorage {
         P: IntoIterator<Item = &'a [u8]>,
     {
         let body = Self::build_prefix_body(path);
+        let blocks_count = (body.len() + BLAKE_BLOCK_LEN - 1) / BLAKE_BLOCK_LEN;
+
         blake3::hash(&body)
             .as_bytes()
             .to_vec()
-            .wrap_with_cost(OperationCost::default()) // TODO: actual costs
+            .wrap_with_cost(OperationCost::with_hash_node_calls(blocks_count as u16))
     }
 }
 
@@ -277,6 +270,17 @@ impl<'db> Storage<'db> for RocksDbStorage {
         cost.storage_freed_bytes += pending_storage_freed_bytes;
 
         result.wrap_with_cost(cost)
+    }
+
+
+    fn get_storage_context_cost<'a, P>(path: P) -> OperationCost
+    where
+        P: IntoIterator<Item = &'a [u8]>,
+    {
+        let body = Self::build_prefix_body(path);
+        // the block size of blake3 is 64
+        let blocks_num = (body.len() / BLAKE_BLOCK_LEN + 1) as u16;
+        OperationCost::with_hash_node_calls(blocks_num)
     }
 
     fn create_checkpoint<P: AsRef<Path>>(&self, path: P) -> Result<(), Self::Error> {

@@ -192,6 +192,7 @@ impl Tree {
     /// Computes and returns the hash of the root node.
     #[inline]
     pub fn hash(&self) -> CostContext<Hash> {
+        // TODO: should we compute node hash as we already have a node hash?
         node_hash(
             self.inner.kv.hash(),
             self.child_hash(true),

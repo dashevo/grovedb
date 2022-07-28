@@ -86,6 +86,11 @@ pub trait Storage<'db> {
 
     /// Creates a database checkpoint in a specified path
     fn create_checkpoint<P: AsRef<Path>>(&self, path: P) -> Result<(), Self::Error>;
+
+    /// Return worst case cost for storage context creation.
+    fn get_storage_context_cost<'a, P>(path: P) -> OperationCost
+    where
+        P: IntoIterator<Item = &'a [u8]>;
 }
 
 /// Storage context.

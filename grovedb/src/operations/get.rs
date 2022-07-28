@@ -3,7 +3,7 @@ use std::collections::HashSet;
 use costs::{
     cost_return_on_error, cost_return_on_error_no_add, CostResult, CostsExt, OperationCost,
 };
-use storage::StorageContext;
+use storage::{rocksdb_storage::RocksDbStorage, StorageContext};
 
 use crate::{
     query_result_type::{QueryResultElement, QueryResultElements, QueryResultType},
@@ -323,8 +323,13 @@ where {
         let mut cost = OperationCost::default();
 
         // First we get the merk tree
-        Self::add_worst_case_get_merk(&mut cost, path);
-        Self::add_worst_case_merk_has_element(&mut cost, key);
+        Self::add_worst_case_get_merk::<_, RocksDbStorage>(
+            &mut cost,
+            path,
+            crate::MAX_ELEMENT_SIZE,
+        ); // TODO: use GroveDb's storage type parameter when it will be finally abstract
+           // over it
+        Self::add_worst_case_merk_has_element(&mut cost, key, crate::MAX_ELEMENT_SIZE);
 
         // In the worst case, there will not be an error, but the item will not be found
         Ok(false).wrap_with_cost(cost)
