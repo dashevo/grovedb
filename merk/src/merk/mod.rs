@@ -681,7 +681,9 @@ impl MerkCommitter {
 impl Commit for MerkCommitter {
     fn write(&mut self, tree: &Tree) -> Result<()> {
         let mut buf = Vec::with_capacity(tree.encoding_length());
+        // dbg!(&tree);
         tree.encode_into(&mut buf);
+        // dbg!(buf.len());
         self.batch.push((tree.key().to_vec(), Some(buf)));
         Ok(())
     }
@@ -921,6 +923,46 @@ mod test {
         .unwrap()
         .unwrap();
         assert!(merk.get(&[3, 3, 3]).unwrap().unwrap().is_none());
+    }
+
+    #[test]
+    fn reopen_check_root_hash() {
+        let tmp_dir = TempDir::new().expect("cannot open tempdir");
+        let storage = RocksDbStorage::default_rocksdb_with_path(tmp_dir.path())
+            .expect("cannot open rocksdb storage");
+        let mut merk = Merk::open(storage.get_storage_context(empty()).unwrap())
+            .unwrap()
+            .expect("cannot open merk");
+        let batch = make_batch_seq(1..10);
+        merk.apply::<_, Vec<_>>(batch.as_slice(), &[])
+            .unwrap()
+            .unwrap();
+        let batch = make_batch_seq(11..12);
+        merk.apply::<_, Vec<_>>(batch.as_slice(), &[])
+            .unwrap()
+            .unwrap();
+    }
+
+    #[test]
+    fn test_get_node_cost() {
+        let tmp_dir = TempDir::new().expect("cannot open tempdir");
+        let storage = RocksDbStorage::default_rocksdb_with_path(tmp_dir.path())
+            .expect("cannot open rocksdb storage");
+        let mut merk = Merk::open(storage.get_storage_context(empty()).unwrap())
+            .unwrap()
+            .expect("cannot open merk");
+        let batch = make_batch_seq(1..10);
+        merk.apply::<_, Vec<_>>(batch.as_slice(), &[])
+            .unwrap()
+            .unwrap();
+        drop(merk);
+
+        let mut merk = Merk::open(storage.get_storage_context(empty()).unwrap())
+            .unwrap()
+            .expect("cannot open merk");
+        let m = merk.get(&9_u64.to_be_bytes());
+        let m = merk.get(&8_u64.to_be_bytes());
+        // dbg!(m);
     }
 
     #[test]
